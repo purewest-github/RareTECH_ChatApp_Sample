@@ -1,0 +1,2 @@
+# RareTECH_ChatApp_Sample
+RareTECHのハッカソン入門コースのチャットアプリ
