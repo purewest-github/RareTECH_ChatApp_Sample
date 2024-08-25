@@ -1,0 +1,17 @@
+FROM python:3.11-slim-buster
+
+# 必要なパッケージをインストール
+RUN apt update && apt install -y \
+    build-essential \
+    python3-dev \
+    default-libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ChatApp .
+
+CMD ["python", "app.py"]

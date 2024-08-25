@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  nginx:
+    container_name: Nginx
+    build:
+      context: .
+      dockerfile: Docker/Nginx/Dockerfile
+    platform: linux/x86_64
+    ports:
+      - "80:80"
+    depends_on:
+      - flask
+
+  flask:
+    container_name: Flask
+    build:
+      context: .
+      dockerfile: Docker/Flask/Dockerfile.prod
+    platform: linux/x86_64
+    env_file:
+      - .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    container_name: MySQL
+    build:
+      context: .
+      dockerfile: Docker/MySQL/Dockerfile.prod
+    platform: linux/x86_64
+    volumes:
+      - mysql_data:/var/lib/mysql
+    env_file:
+      - .env.production
+    healthcheck:
+      test: mysqladmin ping -h 127.0.0.1 -u${MYSQL_USER} -p${MYSQL_PASSWORD}
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mysql_data:
