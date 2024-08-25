@@ -11,6 +11,8 @@ services:
       - "80:80"
     depends_on:
       - flask
+    networks:
+      - app-network
 
   flask:
     container_name: Flask
@@ -23,6 +25,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - app-network
 
   db:
     container_name: MySQL
@@ -40,6 +44,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   mysql_data:
