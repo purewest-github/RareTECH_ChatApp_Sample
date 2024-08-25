@@ -14,8 +14,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - app-network
 
   db:
     container_name: MySQL
@@ -33,30 +31,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    networks:
-      - app-network
 
   phpmyadmin:
     container_name: phpMyAdmin
     image: phpmyadmin/phpmyadmin
-    env_file:
-      - .env.development
     environment:
-      PMA_HOST: ${MYSQL_HOST}
-      PMA_PORT: ${MYSQL_PORT}
-      PMA_USER: ${MYSQL_USER}
-      PMA_PASSWORD: ${MYSQL_PASSWORD}
+      PMA_ARBITRARY: 1
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: ${MYSQL_ROOT_PASSWORD}
     ports:
-      - "${PMA_ACCESS_PORT}:80"
+      - "4000:80"
+    volumes:
+      - phpmyadmin:/sessions
     depends_on:
       - db
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
 
 volumes:
   mysql_data:
+  phpmyadmin:
 
