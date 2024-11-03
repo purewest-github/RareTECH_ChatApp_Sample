@@ -27,6 +27,7 @@ from urllib.parse import urlparse, urljoin
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
+import secrets
 
 from models import (
     user_model, 
@@ -45,7 +46,22 @@ load_dotenv(env_file)
 app = Flask(__name__)
 
 # セキュリティ設定
-app.secret_key = os.getenv('FLASK_SECRET_KEY', uuid.uuid4().hex)
+# app.secret_key = os.getenv('FLASK_SECRET_KEY', uuid.uuid4().hex)
+def validate_secret_key(key: str) -> bool:
+    """シークレットキーの妥当性を検証"""
+    return len(key) >= 64 and key.isalnum()
+
+secret_key = os.getenv('FLASK_SECRET_KEY')
+if not secret_key or not validate_secret_key(secret_key):
+    if app.debug:
+        # 開発環境の場合は自動生成
+        secret_key = secrets.token_hex(32)
+        print(f"Warning: Using auto-generated secret key: {secret_key}")
+    else:
+        # 本番環境の場合はエラー
+        raise ValueError("Invalid or missing FLASK_SECRET_KEY")
+
+app.secret_key = secret_key
 app.config.update(
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
@@ -65,11 +81,14 @@ csrf = CSRFProtect(app)
 
 # レート制限の設定
 limiter = Limiter(
-    app,
+    app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=os.getenv('RATE_LIMIT_STORAGE_URI', "memory://")
+    storage_uri="memory://",
+    strategy="fixed-window"  # レート制限の戦略を指定
 )
+
+
 
 # XSS対策の設定
 ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'li', 'code']
@@ -881,15 +900,15 @@ def request_entity_too_large_error(error):
         return jsonify(error='ファイルサイズが大きすぎます'), 413
     return render_template('errors/413.html'), 413
 
+@limiter.request_filter
+def ip_whitelist():
+    return request.remote_addr == "127.0.0.1"
+
 @app.errorhandler(429)
-def too_many_requests_error(error):
-    """429エラーのハンドラ"""
-    logger.warning(f"Rate limit exceeded: {request.remote_addr}")
-    if request.is_xhr:
-        return jsonify(error='リクエスト回数が制限を超えました'), 429
+def ratelimit_handler(e):
     return render_template(
         'errors/429.html',
-        retry_after=error.description
+        retry_after=str(e.description)
     ), 429
 
 @app.errorhandler(500)
