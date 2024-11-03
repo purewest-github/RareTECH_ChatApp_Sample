@@ -1,58 +1,50 @@
-{% extends 'registration/base.html' %} {% block title %}
-<title>login</title>
-{% endblock %} {% block body %}
+{% extends 'registration/base.html' %}
+{% block title %}login{% endblock %}
+{% block body %}
 <div class="registration-wrapper">
-  <div class="registration-container">
-    <img
-      src="{{ url_for('static',filename='img/registration.png') }}"
-      class="registration-main-pic"
-    />
-    <img
-      src="{{ url_for('static',filename='img/mobile-registration.png') }}"
-      class="registration-mobile-pic"
-    />
-    <div class="registration-form-wrapper">
-      <div class="registration-logo">
-        <img
-          src="{{ url_for('static',filename='img/plaudern-logo.png') }}"
-          alt="logo"
-        />
-      </div>
-      <form class="registration-form" method="post">
-        <h1 class="registration-title">WELCOME BACK!</h1>
-        <div>
-          <label for="email-input">Email</label>
-          <input
-            type="text"
-            placeholder="Email"
-            name="email"
-            id="email-input"
-          />
+    <div class="registration-container">
+        <img src="{{ url_for('static', filename='img/registration.png') }}" class="registration-main-pic" alt="registration">
+        <img src="{{ url_for('static', filename='img/mobile-registration.png') }}" class="registration-mobile-pic" alt="mobile registration">
+
+        <div class="registration-form-wrapper">
+            <div class="registration-logo">
+                <img src="{{ url_for('static', filename='img/plaudern-logo.png') }}" alt="logo">
+            </div>
+
+            <form method="POST" action="{{ url_for('login') }}" class="registration-form">
+                {{ form.csrf_token }}
+                {% if request.args.get('next') %}
+                <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+                {% endif %}
+
+                <h1 class="registration-title">WELCOME BACK!</h1>
+
+                <div>
+                    <label for="email">Email</label>
+                    {{ form.email(class="form-control", placeholder="メールアドレスを入力してください") }}
+                </div>
+
+                <div>
+                    <label for="password">Password</label>
+                    {{ form.password(class="form-control", placeholder="パスワードを入力してください") }}
+                </div>
+
+                <div class="registration-button-container">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            <ul class="flashes">
+                                {% for message in messages %}
+                                    <li>{{ message }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    {% endwith %}
+
+                    <button type="submit" class="registration-button pink">LOGIN</button>
+                    <a href="{{ url_for('signup') }}" class="switch-register-mode">登録はこちら</a>
+                </div>
+            </form>
         </div>
-        <div>
-          <label for="password-input">Password</label>
-          <input
-            type="password"
-            placeholder="Password"
-            name="password"
-            id="password-input"
-          />
-        </div>
-        <div class="registration-button-container">
-          {% with messages = get_flashed_messages() %} {% if messages %}
-          <ul class="flashes">
-            {% for message in messages %}
-            <li>{{ message }}</li>
-            {% endfor %}
-          </ul>
-          {% endif %} {% endwith %}
-          <button class="registration-button pink">LOGIN</button>
-          <a class="switch-register-mode" href="{{ url_for('signup') }}">
-            登録はこちら
-          </a>
-        </div>
-      </form>
     </div>
-  </div>
 </div>
 {% endblock %}

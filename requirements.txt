@@ -1,45 +1,45 @@
 # Web Framework
-Flask==2.2.2
-Werkzeug==2.2.2
-Jinja2==3.1.2
-itsdangerous==2.1.2
-MarkupSafe==2.1.1
-uWSGI==2.0.26
-click==8.1.3
+Flask
+Werkzeug
+Jinja2
+itsdangerous
+MarkupSafe
+uWSGI
+click
 
 # Database
-PyMySQL==1.0.2
-SQLAlchemy==1.4.41
-greenlet==3.0.3
+PyMySQL
+SQLAlchemy
+greenlet
 
 # Security
-cryptography==38.0.1
-pycryptodome==3.15.0
-pycparser==2.21
-cffi==1.15.1
-Flask-WTF==1.1.1  # CSRF保護用
-bleach==6.0.0     # XSS対策用
-pyOpenSSL==23.2.0  # SSL対応用
+cryptography
+pycryptodome
+pycparser
+cffi
+Flask-WTF # CSRF保護用
+bleach    # XSS対策用
+pyOpenSSL  # SSL対応用
 
 # Rate Limiting
-Flask-Limiter>=3.3.1
-limits>=3.6.0
+Flask-Limiter
+limits
 
 # Utilities
-python-dotenv==1.0.1
-requests==2.28.1
-urllib3==1.26.12
-certifi==2022.9.14
-charset-normalizer==2.1.1
-idna==3.4
-PyYAML==6.0
+python-dotenv
+requests
+urllib3
+certifi
+charset-normalizer
+idna
+PyYAML
 
 # Logging
-structlog==23.1.0  # 構造化ログ用
+structlog  # 構造化ログ用
 
 # Development
-pytest==7.4.0     # テスト用
-pytest-cov==4.1.0  # カバレッジレポート用
-black==23.7.0     # コードフォーマット用
-flake8==6.1.0     # コードリント用
-mypy==1.4.1       # 型チェック用
+pytest     # テスト用
+pytest-cov  # カバレッジレポート用
+black     # コードフォーマット用
+flake8     # コードリント用
+mypy       # 型チェック用

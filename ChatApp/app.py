@@ -21,13 +21,16 @@ import bleach
 import time
 from typing import Optional, Union, Dict, Any, Tuple
 from functools import wraps
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.security import safe_join
 from urllib.parse import urlparse, urljoin
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 import secrets
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, EmailField
+from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
 
 from models import (
     user_model, 
@@ -63,6 +66,9 @@ if not secret_key or not validate_secret_key(secret_key):
 
 app.secret_key = secret_key
 app.config.update(
+    SECRET_KEY=secret_key,  # 既存のsecret_key設定を使用
+    WTF_CSRF_SECRET_KEY=secret_key,  # CSRFトークン用のシークレットキーを設定
+    WTF_CSRF_TIME_LIMIT=3600,  # CSRFトークンの有効期限を1時間に設定
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax',
@@ -87,8 +93,6 @@ limiter = Limiter(
     storage_uri="memory://",
     strategy="fixed-window"  # レート制限の戦略を指定
 )
-
-
 
 # XSS対策の設定
 ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'li', 'code']
@@ -446,149 +450,169 @@ def utility_processor():
         csrf_token=SecurityUtils.generate_csrf_token
     )
 
+# フォームクラスの定義
+class LoginForm(FlaskForm):
+    """ログインフォーム"""
+    email = EmailField('Email', validators=[
+        DataRequired(message='メールアドレスは必須です'),
+        Email(message='有効なメールアドレスを入力してください')
+    ])
+    password = PasswordField('Password', validators=[
+        DataRequired(message='パスワードは必須です'),
+        Length(min=MIN_PASSWORD_LENGTH, max=MAX_PASSWORD_LENGTH, 
+               message=f'パスワードは{MIN_PASSWORD_LENGTH}文字以上{MAX_PASSWORD_LENGTH}文字以内で入力してください')
+    ])
+
+# パスワードの複雑さをチェックするカスタムバリデータ
+def password_complexity(form, field):
+    """パスワードの複雑さをチェック（SecurityUtilsクラスを利用）"""
+    is_valid, message = SecurityUtils.validate_password(field.data)
+    if not is_valid:
+        raise ValidationError(message)
+
+class SignupForm(FlaskForm):
+    """サインアップフォーム"""
+    name = StringField('Name', validators=[
+        DataRequired(message='ユーザー名は必須です'),
+        Length(min=2, max=50, message='ユーザー名は2文字以上50文字以内で入力してください')
+    ])
+    email = EmailField('Email', validators=[
+        DataRequired(message='メールアドレスは必須です'),
+        Email(message='有効なメールアドレスを入力してください')
+    ])
+    password1 = PasswordField('Password', validators=[
+        DataRequired(message='パスワードは必須です'),
+        Length(min=MIN_PASSWORD_LENGTH, max=MAX_PASSWORD_LENGTH, 
+               message=f'パスワードは{MIN_PASSWORD_LENGTH}文字以上{MAX_PASSWORD_LENGTH}文字以内で入力してください'),
+        password_complexity
+    ])
+    password2 = PasswordField('Password Confirmation', validators=[
+        DataRequired(message='パスワード（確認）は必須です'),
+        EqualTo('password1', message='パスワードが一致しません')
+    ])
+
 # 認証関連のルート
-@app.route('/signup')
-def signup():
-    """サインアップページの表示"""
-    if 'uid' in session:
-        return redirect(url_for('index'))
-    return render_template('registration/signup.html')
 
-@app.route('/signup', methods=['POST'])
+# ログインルートの修正
+@app.route('/login', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
-def user_signup():
-    """ユーザー登録処理"""
-    try:
-        # フォームデータのサニタイズと取得
-        name = XSSProtection.sanitize_input(request.form.get('name', '').strip())
-        email = request.form.get('email', '').strip().lower()
-        password1 = request.form.get('password1', '')
-        password2 = request.form.get('password2', '')
-
-        # 入力値の検証
-        if not all([name, email, password1, password2]):
-            flash('全ての項目を入力してください', 'error')
-            return redirect(url_for('signup'))
-
-        if password1 != password2:
-            flash('パスワードが一致しません', 'error')
-            return redirect(url_for('signup'))
-
-        if not SecurityUtils.validate_email(email):
-            flash('有効なメールアドレスを入力してください', 'error')
-            return redirect(url_for('signup'))
-
-        is_valid, message = SecurityUtils.validate_password(password1)
-        if not is_valid:
-            flash(message, 'error')
-            return redirect(url_for('signup'))
-
-        # ユーザー作成
-        uid = str(uuid.uuid4())
-        user_model.create(name, email, password1)
-        
-        # セッション設定
-        session.clear()
-        session['uid'] = uid
-        session['user_name'] = name
-        session['is_admin'] = False
-        session['_session_id'] = uuid.uuid4().hex
-        session.permanent = True
-        
-        logger.info(f"New user registered: {email}")
-        flash('アカウントが作成されました', 'success')
-        return redirect(url_for('index'))
-
-    except UniqueConstraintError:
-        flash('このメールアドレスは既に登録されています', 'error')
-        return redirect(url_for('signup'))
-    except DatabaseError as e:
-        logger.error(f"Database error during signup: {str(e)}")
-        flash('アカウント作成中にエラーが発生しました', 'error')
-        return redirect(url_for('signup'))
-    except Exception as e:
-        logger.error(f"Unexpected error during signup: {str(e)}")
-        flash('予期せぬエラーが発生しました', 'error')
-        return redirect(url_for('signup'))
-
-@app.route('/login')
 def login():
-    """ログインページの表示"""
+    """ログインページの表示と処理"""
     if 'uid' in session:
         return redirect(url_for('index'))
-    return render_template('registration/login.html')
 
-@app.route('/login', methods=['POST'])
+    form = LoginForm()
+    
+    if request.method == 'POST':
+        if form.validate_on_submit():
+            try:
+                email = form.email.data
+                password = form.password.data
+
+                # ログイン試行回数のチェック
+                login_attempts = session.get('login_attempts', 0)
+                last_attempt = session.get('last_attempt', 0)
+                
+                if login_attempts >= MAX_LOGIN_ATTEMPTS:
+                    if time.time() - last_attempt < LOGIN_TIMEOUT:
+                        flash(f'ログイン試行回数が上限を超えました。{LOGIN_TIMEOUT}秒後に再試行してください', 'error')
+                        return render_template('registration/login.html', form=form)
+                    session['login_attempts'] = 0
+
+                user = user_model.get_by_email(email)
+                if not user:
+                    session['login_attempts'] = login_attempts + 1
+                    session['last_attempt'] = time.time()
+                    logger.warning(f"Failed login attempt: User not found - {email}")
+                    flash('メールアドレスまたはパスワードが正しくありません', 'error')
+                    return render_template('registration/login.html', form=form)
+
+                if not user.get('is_active', True):
+                    logger.warning(f"Login attempt for inactive account: {email}")
+                    flash('このアカウントは現在無効になっています', 'error')
+                    return render_template('registration/login.html', form=form)
+
+                # パスワードの検証
+                hashed_password = user_model._hash_password(password)
+                if hashed_password != user['password']:
+                    session['login_attempts'] = login_attempts + 1
+                    session['last_attempt'] = time.time()
+                    logger.warning(f"Failed login attempt: Invalid password - {email}")
+                    flash('メールアドレスまたはパスワードが正しくありません', 'error')
+                    return render_template('registration/login.html', form=form)
+
+                # ログイン成功
+                session.clear()
+                session['uid'] = user['uid']
+                session['user_name'] = user['user_name']
+                session['is_admin'] = user.get('is_admin', False)
+                session['_session_id'] = uuid.uuid4().hex
+                session.permanent = True
+
+                logger.info(f"User logged in successfully: {email}")
+                flash('ログインしました', 'success')
+
+                # 安全な次のURLへリダイレクト
+                next_url = request.form.get('next')
+                if next_url and URLValidator.is_safe_redirect(next_url):
+                    return redirect(next_url)
+                return redirect(url_for('index'))
+
+            except DatabaseError as e:
+                logger.error(f"Database error during login: {str(e)}")
+                flash('ログイン処理中にエラーが発生しました', 'error')
+            except Exception as e:
+                logger.error(f"Unexpected error during login: {str(e)}")
+                flash('予期せぬエラーが発生しました', 'error')
+
+    return render_template('registration/login.html', form=form)
+
+# サインアップルートの修正
+# ルート定義の修正
+@app.route('/signup', methods=['GET', 'POST'])
 @limiter.limit("5 per minute")
-def user_login():
-    """ログイン処理"""
-    try:
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        next_url = request.form.get('next', '')
-
-        if not email or not password:
-            flash('メールアドレスとパスワードを入力してください', 'error')
-            return redirect(url_for('login'))
-
-        # ログイン試行回数のチェック
-        login_attempts = session.get('login_attempts', 0)
-        last_attempt = session.get('last_attempt', 0)
-        
-        if login_attempts >= MAX_LOGIN_ATTEMPTS:
-            if time.time() - last_attempt < LOGIN_TIMEOUT:
-                flash(f'ログイン試行回数が上限を超えました。{LOGIN_TIMEOUT}秒後に再試行してください', 'error')
-                return redirect(url_for('login'))
-            session['login_attempts'] = 0
-
-        user = user_model.get_by_email(email)
-        if not user:
-            session['login_attempts'] = login_attempts + 1
-            session['last_attempt'] = time.time()
-            logger.warning(f"Failed login attempt: User not found - {email}")
-            flash('メールアドレスまたはパスワードが正しくありません', 'error')
-            return redirect(url_for('login'))
-
-        if not user.get('is_active', True):
-            logger.warning(f"Login attempt for inactive account: {email}")
-            flash('このアカウントは現在無効になっています', 'error')
-            return redirect(url_for('login'))
-
-        # パスワードの検証
-        hashed_password = user_model._hash_password(password)
-        if hashed_password != user['password']:
-            session['login_attempts'] = login_attempts + 1
-            session['last_attempt'] = time.time()
-            logger.warning(f"Failed login attempt: Invalid password - {email}")
-            flash('メールアドレスまたはパスワードが正しくありません', 'error')
-            return redirect(url_for('login'))
-
-        # ログイン成功
-        session.clear()
-        session['uid'] = user['uid']
-        session['user_name'] = user['user_name']
-        session['is_admin'] = user.get('is_admin', False)
-        session['_session_id'] = uuid.uuid4().hex
-        session.permanent = True
-
-        logger.info(f"User logged in successfully: {email}")
-        flash('ログインしました', 'success')
-
-        # 安全な次のURLへリダイレクト
-        if next_url and URLValidator.is_safe_redirect(next_url):
-            return redirect(next_url)
+def signup():
+    """サインアップページの表示と処理"""
+    if 'uid' in session:
         return redirect(url_for('index'))
 
-    except DatabaseError as e:
-        logger.error(f"Database error during login: {str(e)}")
-        flash('ログイン処理中にエラーが発生しました', 'error')
-        return redirect(url_for('login'))
-    except Exception as e:
-        logger.error(f"Unexpected error during login: {str(e)}")
-        flash('予期せぬエラーが発生しました', 'error')
-        return redirect(url_for('login'))
+    form = SignupForm()
+    if form.validate_on_submit():
+        try:
+            name = XSSProtection.sanitize_input(form.name.data.strip())
+            email = form.email.data.strip().lower()
+            password = form.password1.data
 
+            # ユーザー作成
+            uid = str(uuid.uuid4())
+            user_model.create(name, email, password)
+            
+            # セッション設定
+            session.clear()
+            session['uid'] = uid
+            session['user_name'] = name
+            session['is_admin'] = False
+            session['_session_id'] = uuid.uuid4().hex
+            session.permanent = True
+            
+            logger.info(f"New user registered: {email}")
+            flash('アカウントが作成されました', 'success')
+            return redirect(url_for('index'))
+
+        except UniqueConstraintError:
+            flash('このメールアドレスは既に登録されています', 'error')
+        except DatabaseError as e:
+            logger.error(f"Database error during signup: {str(e)}")
+            flash('アカウント作成中にエラーが発生しました', 'error')
+        except Exception as e:
+            logger.error(f"Unexpected error during signup: {str(e)}")
+            flash('予期せぬエラーが発生しました', 'error')
+
+    return render_template('registration/signup.html', form=form)
+
+# ログアウトルートの修正（レート制限の追加）
 @app.route('/logout')
+@limiter.limit("10 per minute")  # レート制限を追加
 def logout():
     """ログアウト処理"""
     if 'uid' in session:
@@ -868,11 +892,15 @@ def uploaded_file(filename):
 
 
 # エラーハンドラ
+def is_ajax_request():
+    """AJAXリクエストかどうかを判定"""
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.accept_mimetypes.best == 'application/json'
+
 @app.errorhandler(400)
 def bad_request_error(error):
     """400エラーのハンドラ"""
     logger.error(f"400 error: {request.url}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error='不正なリクエストです'), 400
     return render_template('errors/400.html'), 400
 
@@ -880,7 +908,7 @@ def bad_request_error(error):
 def forbidden_error(error):
     """403エラーのハンドラ"""
     logger.error(f"403 error: {request.url}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error='アクセス権限がありません'), 403
     return render_template('errors/403.html'), 403
 
@@ -888,7 +916,7 @@ def forbidden_error(error):
 def not_found_error(error):
     """404エラーのハンドラ"""
     logger.error(f"404 error: {request.url}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error='ページが見つかりません'), 404
     return render_template('errors/404.html'), 404
 
@@ -896,16 +924,15 @@ def not_found_error(error):
 def request_entity_too_large_error(error):
     """413エラーのハンドラ"""
     logger.error(f"413 error: {request.url}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error='ファイルサイズが大きすぎます'), 413
     return render_template('errors/413.html'), 413
 
-@limiter.request_filter
-def ip_whitelist():
-    return request.remote_addr == "127.0.0.1"
-
 @app.errorhandler(429)
 def ratelimit_handler(e):
+    """429エラーのハンドラ"""
+    if is_ajax_request():
+        return jsonify(error='リクエスト回数が制限を超えました', retry_after=str(e.description)), 429
     return render_template(
         'errors/429.html',
         retry_after=str(e.description)
@@ -915,15 +942,24 @@ def ratelimit_handler(e):
 def internal_error(error):
     """500エラーのハンドラ"""
     logger.error(f"500 error: {str(error)}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error='内部サーバーエラーが発生しました'), 500
     return render_template('errors/500.html'), 500
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """CSRFエラーのハンドラ"""
+    logger.error(f"CSRF error: {str(e)}")
+    if is_ajax_request():
+        return jsonify(error='CSRFトークンが無効です'), 400
+    flash('セッションが切れました。もう一度お試しください。', 'error')
+    return redirect(url_for('login'))
 
 @app.errorhandler(DatabaseError)
 def handle_database_error(error):
     """データベースエラーのハンドラ"""
     logger.error(f"Database error: {str(error)}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error='データベースエラーが発生しました'), 500
     flash('データベース操作中にエラーが発生しました', 'error')
     return redirect(url_for('index'))
@@ -932,7 +968,7 @@ def handle_database_error(error):
 def handle_validation_error(error):
     """バリデーションエラーのハンドラ"""
     logger.warning(f"Validation error: {str(error)}")
-    if request.is_xhr:
+    if is_ajax_request():
         return jsonify(error=str(error)), 400
     flash(str(error), 'error')
     return redirect(request.referrer or url_for('index'))

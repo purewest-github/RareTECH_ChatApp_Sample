@@ -1,0 +1,21 @@
+{% extends 'errors/base.html' %}
+{% block title %}429 Too Many Requests{% endblock %}
+{% block body %}
+<div class="error-wrapper">
+    <div class="error-content">
+        <div class="error-title">
+            <span>429</span>
+        </div>
+        <div class="error-description">
+            <p>アクセス回数が制限を超えました</p>
+            <p>しばらく時間をおいてから再度お試しください</p>
+            {% if retry_after %}
+            <p>再試行可能まで: {{ retry_after }}</p>
+            {% endif %}
+            <p>
+                <a href="{{ url_for('index') }}" class="error-button pink">ホームに戻る</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
