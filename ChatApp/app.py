@@ -948,6 +948,7 @@ if app.debug:
 
 # アプリケーション起動
 if __name__ == '__main__':
+    <<<<<<< HEAD
     # 必要なディレクトリの作成
     for directory in ['logs', app.config['UPLOAD_FOLDER']]:
         os.makedirs(directory, exist_ok=True)
@@ -985,3 +986,6 @@ if __name__ == '__main__':
         ssl_context=ssl_context
     )
     
+=======
+    app.run(host="0.0.0.0")
+>>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7

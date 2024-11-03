@@ -1,8 +1,12 @@
+<<<<<<< HEAD
 # util/DB.py
 
 import os
 import logging
 from typing import Any, Optional, Type
+=======
+import os
+>>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
 import pymysql
 from pymysql.cursors import DictCursor
 from contextlib import contextmanager
@@ -147,6 +151,7 @@ class DB:
         """データベース接続を管理するコンテキストマネージャー"""
         conn = None
         try:
+<<<<<<< HEAD
             conn = pymysql.connect(**self.config)
             logger.debug("Database connection established")
             yield conn
@@ -303,3 +308,17 @@ class DB:
         
         set_clause = ','.join([f"`{field}`=%s" for field in fields])
         return f"UPDATE `{table}` SET {set_clause} WHERE {where_clause}"
+=======
+            conn = pymysql.connect(
+            host=os.getenv('MYSQL_HOST'),
+            db=os.getenv('MYSQL_NAME'),
+            user=os.getenv('MYSQL_USER'),
+            password=os.getenv('MYSQL_PASSWORD'),
+            charset="utf8",
+            cursorclass=pymysql.cursors.DictCursor
+        )
+            return conn
+        except (ConnectionError):
+            print("コネクションエラーです")
+            conn.close()
+>>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
