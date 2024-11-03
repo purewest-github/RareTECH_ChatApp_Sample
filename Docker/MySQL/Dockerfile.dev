@@ -1,10 +1,44 @@
 # MySQL8系のイメージを指定
 FROM mysql:8.0
 
+# システムのタイムゾーンを設定
+ENV TZ=Asia/Tokyo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# ログディレクトリの作成と権限設定
+RUN mkdir -p /var/log/mysql && \
+    chown -R mysql:mysql /var/log/mysql && \
+    chmod 755 /var/log/mysql
+
 # MySQLのローカルの設定ファイルをコンテナにコピー
 COPY Docker/MySQL/my.cnf /etc/mysql/conf.d/my.cnf
-# init.sqlをコンテナの/docker-entrypoint-init.db.dと共有
+
+# 認証方式の設定
+RUN echo "[mysqld]" >> /etc/mysql/conf.d/mysql.cnf && \
+    echo "default_authentication_plugin=mysql_native_password" >> /etc/mysql/conf.d/mysql.cnf
+
+# 初期化スクリプトのコピー
 COPY Docker/MySQL/init_dev.sql /docker-entrypoint-initdb.d/
 
-# rootユーザーのリモートアクセスを許可
-RUN echo "ALTER USER 'root'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_ROOT_PASSWORD}';" > /docker-entrypoint-initdb.d/root-access.sql
+# ヘルスチェック用のカスタムスクリプト
+COPY Docker/MySQL/healthcheck.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/healthcheck.sh
+
+# MySQLの設定ファイルとデータディレクトリの権限を設定
+RUN chown -R mysql:mysql /etc/mysql/conf.d && \
+    chmod 644 /etc/mysql/conf.d/my.cnf
+
+# コンテナのヘルスチェックを設定
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["healthcheck.sh"]
+
+# MySQL用のポートを公開
+EXPOSE 3306
+
+# デフォルトの文字コードを設定
+ENV LANG=C.UTF-8
+ENV LANGUAGE=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# MySQLサーバーの起動
+CMD ["mysqld"]

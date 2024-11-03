@@ -1,7 +1,7 @@
 FROM python:3.11-slim-buster
 
 # 必要なパッケージをインストール
-RUN apt update && apt install -y \
+RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
     default-libmysqlclient-dev \
@@ -9,9 +9,17 @@ RUN apt update && apt install -y \
 
 WORKDIR /app
 
+# 必要なディレクトリを作成
+RUN mkdir -p /app/logs /app/uploads
+
+# requirements.txtをコピーして依存関係をインストール
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# アプリケーションのコピー
 COPY ChatApp .
+
+# 実行権限の設定
+RUN chmod -R 755 /app
 
 CMD ["python", "app.py"]
