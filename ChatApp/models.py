@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from typing import Optional, List, Dict, Any
 import logging
 from datetime import datetime
@@ -70,56 +69,6 @@ class User(ModelBase):
 
     def create(self, name: str, email: str, password: str) -> str:
         """ユーザーを作成"""
-=======
-import pymysql
-from util.DB import DB
-from flask import abort
-
-class dbConnect:
-    @staticmethod
-    def createUser(uid, name, email, password):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "INSERT INTO users (uid, user_name, email, password) VALUES (%s, %s, %s, %s);"
-            cur.execute(sql, (uid, name, email, password))
-            conn.commit()
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def getUser(email):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "SELECT * FROM users WHERE email=%s;"
-            cur.execute(sql, [email])
-            user = cur.fetchone()
-            return user
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def getChannelAll():
-        conn = None
-        cur = None
->>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
         try:
             self._validate_user_data(name, email, password)
             
@@ -155,7 +104,6 @@ class dbConnect:
             return uid
 
         except Exception as e:
-<<<<<<< HEAD
             self._handle_db_error(e, "user creation")
 
     def get_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -254,60 +202,6 @@ class Channel(ModelBase):
 
     def create(self, uid: str, name: str, description: str) -> int:
         """チャンネルを作成"""
-=======
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def getChannelById(cid):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "SELECT * FROM channels WHERE id=%s;"
-            cur.execute(sql, [cid])
-            channel = cur.fetchone()
-            return channel
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def getChannelByName(channel_name):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "SELECT * FROM channels WHERE name=%s;"
-            cur.execute(sql, [channel_name])
-            channel = cur.fetchone()
-            return channel
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def addChannel(uid, newChannelName, newChannelDescription):
-        conn = None
-        cur = None
->>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
         try:
             self._validate_channel_data(name, description)
             
@@ -328,7 +222,6 @@ class Channel(ModelBase):
             return channel_id
 
         except Exception as e:
-<<<<<<< HEAD
             self._handle_db_error(e, "channel creation")
 
     def get_all(self, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
@@ -405,20 +298,6 @@ class Channel(ModelBase):
 
     def delete(self, channel_id: int, uid: str) -> None:
         """チャンネルを論理削除"""
-=======
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def updateChannel(uid, newChannelName, newChannelDescription, cid):
-        conn = None
-        cur = None
->>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
         try:
             with self.db.transaction() as (conn, cur):
                 # 権限チェック
@@ -441,7 +320,6 @@ class Channel(ModelBase):
             logger.info(f"Channel deleted: {channel_id} by {uid}")
 
         except Exception as e:
-<<<<<<< HEAD
             self._handle_db_error(e, "channel deletion")
 
 class Message(ModelBase):
@@ -572,59 +450,6 @@ class Message(ModelBase):
 
     def delete(self, message_id: int, uid: str) -> None:
         """メッセージを削除"""
-=======
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def deleteChannel(cid):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "DELETE FROM channels WHERE id=%s;"
-            cur.execute(sql, [cid])
-            conn.commit()
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def getMessageAll(cid):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "SELECT id, u.uid, user_name, message FROM messages AS m INNER JOIN users AS u ON m.uid = u.uid WHERE cid = %s;"
-            cur.execute(sql, [cid])
-            messages = cur.fetchall()
-            return messages
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def createMessage(uid, cid, message):
-        conn = None
-        cur = None
->>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
         try:
             with self.db.transaction() as (conn, cur):
                 # メッセージの存在と権限の確認
@@ -653,7 +478,6 @@ class Message(ModelBase):
             logger.info(f"Message deleted: {message_id} by {uid}")
 
         except Exception as e:
-<<<<<<< HEAD
             self._handle_db_error(e, "message deletion")
 
     def get_recent_messages(
@@ -710,31 +534,3 @@ class Message(ModelBase):
 user_model = User()
 channel_model = Channel()
 message_model = Message()
-=======
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-    @staticmethod
-    def deleteMessage(message_id):
-        conn = None
-        cur = None
-        try:
-            conn = DB.getConnection()
-            cur = conn.cursor()
-            sql = "DELETE FROM messages WHERE id=%s;"
-            cur.execute(sql, [message_id])
-            conn.commit()
-        except Exception as e:
-            print(f"Error occurred: {str(e)}")
-            abort(500)
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
->>>>>>> 2fcc41813b036c8335df730dbe4eb20e61b4edb7
